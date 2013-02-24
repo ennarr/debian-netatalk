@@ -1,5 +1,4 @@
 /*
-  $Id: afpfunc_helpers.c,v 1.1.2.1 2010-02-01 10:56:08 franklahm Exp $
   Copyright (c) 2010 Frank Lahm <franklahm@gmail.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -176,6 +175,7 @@ int enumerate(AFPObj *obj, uint16_t vid, cnid_t did)
     char buf[bufsize];
     char *p = buf;
     int len = 0;
+    int ret;
 
     ADD(p, len , 2);
 
@@ -189,7 +189,11 @@ int enumerate(AFPObj *obj, uint16_t vid, cnid_t did)
 
     len += push_path(&p, "");
 
-    return afp_enumerate_ext2(obj, buf, len, rbuf, &rbuflen);
+    ret = afp_enumerate_ext2(obj, buf, len, rbuf, &rbuflen);
+
+    if (ret != AFPERR_NOOBJ && ret != AFP_OK)
+        return -1;
+    return 0;
 }
 
 uint16_t openvol(AFPObj *obj, const char *name)

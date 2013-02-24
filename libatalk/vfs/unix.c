@@ -22,52 +22,9 @@
 #include <atalk/logger.h>
 #include <atalk/unix.h>
 #include <atalk/acl.h>
-
-/* -----------------------------
-   a dropbox is a folder where w is set but not r eg:
-   rwx-wx-wx or rwx-wx--
-   rwx----wx (is not asked by a Mac with OS >= 8.0 ?)
-*/
-int stickydirmode(const char *name, const mode_t mode, const int dropbox, const mode_t v_umask)
-{
-    int retval = 0;
-
-#ifdef DROPKLUDGE
-    /* Turn on the sticky bit if this is a drop box, also turn off the setgid bit */
-    if ((dropbox & AFPVOL_DROPBOX)) {
-        int uid;
-
-        if ( ( (mode & S_IWOTH) && !(mode & S_IROTH)) ||
-             ( (mode & S_IWGRP) && !(mode & S_IRGRP)) )
-        {
-            uid=geteuid();
-            if ( seteuid(0) < 0) {
-                LOG(log_error, logtype_afpd, "stickydirmode: unable to seteuid root: %s", strerror(errno));
-            }
-            if ( (retval=chmod_acl( name, ( (DIRBITS | mode | S_ISVTX) & ~v_umask) )) < 0) {
-                LOG(log_error, logtype_afpd, "stickydirmode: chmod \"%s\": %s", fullpathname(name), strerror(errno) );
-            } else {
-                LOG(log_debug, logtype_afpd, "stickydirmode: chmod \"%s\": %s", fullpathname(name), strerror(retval) );
-            }
-            seteuid(uid);
-            return retval;
-        }
-    }
-#endif /* DROPKLUDGE */
-
-    /*
-     *  Ignore EPERM errors:  We may be dealing with a directory that is
-     *  group writable, in which case chmod will fail.
-     */
-    if ( (chmod_acl( name, (DIRBITS | mode) & ~v_umask ) < 0) && errno != EPERM &&
-         !(errno == ENOENT && (dropbox & AFPVOL_NOADOUBLE)) )
-    {
-        LOG(log_error, logtype_afpd, "stickydirmode: chmod \"%s\": %s", fullpathname(name), strerror(errno) );
-        retval = -1;
-    }
-
-    return retval;
-}
+#include <atalk/compat.h>
+#include <atalk/errchk.h>
+#include <atalk/ea.h>
 
 /* ------------------------- */
 int dir_rx_set(mode_t mode)
@@ -76,7 +33,7 @@ int dir_rx_set(mode_t mode)
 }
 
 /* --------------------- */
-int setfilmode(const char * name, mode_t mode, struct stat *st, mode_t v_umask)
+int setfilmode(const struct vol *vol, const char *name, mode_t mode, struct stat *st)
 {
     struct stat sb;
     mode_t mask = S_IRWXU | S_IRWXG | S_IRWXO;  /* rwx for owner group and other, by default */
@@ -87,12 +44,9 @@ int setfilmode(const char * name, mode_t mode, struct stat *st, mode_t v_umask)
         st = &sb;
     }
 
-    if (S_ISLNK(st->st_mode))
-        return 0; /* we don't want to change link permissions */
-    
     mode |= st->st_mode & ~mask; /* keep other bits from previous mode */
 
-    if ( chmod_acl( name,  mode & ~v_umask ) < 0 && errno != EPERM ) {
+    if (ochmod((char *)name, mode & ~vol->v_umask, st, vol_syml_opt(vol) | O_NETATALK_ACL) < 0 && errno != EPERM ) {
         return -1;
     }
     return 0;
@@ -172,6 +126,38 @@ int netatalk_unlink(const char *name)
  * *at semnatics support functions (like openat, renameat standard funcs)
  **************************************************************************/
 
+/* Copy all file data from one file fd to another */
+int copy_file_fd(int sfd, int dfd)
+{
+    EC_INIT;
+    ssize_t cc;
+    size_t  buflen;
+    char   filebuf[NETATALK_DIOSZ_STACK];
+
+    while ((cc = read(sfd, filebuf, sizeof(filebuf)))) {
+        if (cc < 0) {
+            if (errno == EINTR)
+                continue;
+            LOG(log_error, logtype_afpd, "copy_file_fd: %s", strerror(errno));
+            EC_FAIL;
+        }
+
+        buflen = cc;
+        while (buflen > 0) {
+            if ((cc = write(dfd, filebuf, buflen)) < 0) {
+                if (errno == EINTR)
+                    continue;
+                LOG(log_error, logtype_afpd, "copy_file_fd: %s", strerror(errno));
+                EC_FAIL;
+            }
+            buflen -= cc;
+        }
+    }
+
+EC_CLEANUP:
+    EC_EXIT;
+}
+
 /* 
  * Supports *at semantics if HAVE_ATFUNCS, pass dirfd=-1 to ignore this
  */
@@ -180,9 +166,6 @@ int copy_file(int dirfd, const char *src, const char *dst, mode_t mode)
     int    ret = 0;
     int    sfd = -1;
     int    dfd = -1;
-    ssize_t cc;
-    size_t  buflen;
-    char   filebuf[8192];
 
 #ifdef HAVE_ATFUNCS
     if (dirfd == -1)
@@ -204,29 +187,7 @@ int copy_file(int dirfd, const char *src, const char *dst, mode_t mode)
         goto exit;
     }
 
-    while ((cc = read(sfd, filebuf, sizeof(filebuf)))) {
-        if (cc < 0) {
-            if (errno == EINTR)
-                continue;
-            LOG(log_error, logtype_afpd, "copy_file('%s'/'%s'): read '%s' error: %s",
-                src, dst, src, strerror(errno));
-            ret = -1;
-            goto exit;
-        }
-
-        buflen = cc;
-        while (buflen > 0) {
-            if ((cc = write(dfd, filebuf, buflen)) < 0) {
-                if (errno == EINTR)
-                    continue;
-                LOG(log_error, logtype_afpd, "copy_file('%s'/'%s'): read '%s' error: %s",
-                    src, dst, dst, strerror(errno));
-                ret = -1;
-                goto exit;
-            }
-            buflen -= cc;
-        }
-    }
+    ret = copy_file_fd(sfd, dfd);
 
 exit:
     if (sfd != -1)
@@ -245,6 +206,43 @@ exit:
     }
 
     return ret;
+}
+
+/*!
+ * Copy an EA from one file to another
+ *
+ * Supports *at semantics if HAVE_ATFUNCS, pass dirfd=-1 to ignore this
+ */
+int copy_ea(const char *ea, int dirfd, const char *src, const char *dst, mode_t mode)
+{
+    EC_INIT;
+    int    sfd = -1;
+    int    dfd = -1;
+    size_t easize;
+    char   *eabuf = NULL;
+
+#ifdef HAVE_ATFUNCS
+    if (dirfd == -1)
+        dirfd = AT_FDCWD;
+    EC_NEG1_LOG( sfd = openat(dirfd, src, O_RDONLY) );
+#else
+    EC_NEG1_LOG( sfd = open(src, O_RDONLY) );
+#endif
+    EC_NEG1_LOG( dfd = open(dst, O_WRONLY, mode) );
+
+    if ((easize = sys_fgetxattr(sfd, ea, NULL, 0)) > 0) {
+        EC_NULL_LOG( eabuf = malloc(easize));
+        EC_NEG1_LOG( easize = sys_fgetxattr(sfd, ea, eabuf, easize) );
+        EC_NEG1_LOG( easize = sys_fsetxattr(dfd, ea, eabuf, easize, 0) );
+    }
+
+EC_CLEANUP:
+    if (sfd != -1)
+        close(sfd);
+    if (dfd != -1)
+        close(dfd);
+    free(eabuf);
+    EC_EXIT;
 }
 
 /* 
@@ -324,29 +322,6 @@ int statat(int dirfd, const char *path, struct stat *st)
     return (fstatat(dirfd, path, st, 0));
 #else
     return (stat(path, st));
-#endif            
-
-    /* DEADC0DE */
-    return -1;
-}
-
-/* 
- * @brief lstat/fsstatat multiplexer
- *
- * lstatat mulitplexes lstat and fstatat. If we dont HAVE_ATFUNCS, dirfd is ignored.
- *
- * @param dirfd   (r) Only used if HAVE_ATFUNCS, ignored else, -1 gives AT_FDCWD
- * @param path    (r) pathname
- * @param st      (rw) pointer to struct stat
- */
-int lstatat(int dirfd, const char *path, struct stat *st)
-{
-#ifdef HAVE_ATFUNCS
-    if (dirfd == -1)
-        dirfd = AT_FDCWD;
-    return (fstatat(dirfd, path, st, AT_SYMLINK_NOFOLLOW));
-#else
-    return (lstat(path, st));
 #endif            
 
     /* DEADC0DE */

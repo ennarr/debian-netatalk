@@ -434,7 +434,6 @@ struct dir *dircache_search_by_name(const struct vol *vol,
 int dircache_add(const struct vol *vol,
                  struct dir *dir)
 {
-    struct dir *cdir = NULL;
     struct dir key;
     hnode_t *hn;
 
@@ -557,7 +556,7 @@ void dircache_remove(const struct vol *vol _U_, struct dir *dir, int flags)
  * - a DID/name index on the main dircache
  * - a queue index on the dircache
  *
- * @param size   (r) requested maximum size from afpd.conf
+ * @param size   (r) requested maximum size from afp.conf
  *
  * @return 0 on success, -1 on error
  */

@@ -1,5 +1,4 @@
 /*
- * $Id: uams_dhx_pam.c,v 1.33 2010-03-30 10:25:49 franklahm Exp $
  *
  * Copyright (c) 1990,1993 Regents of The University of Michigan.
  * Copyright (c) 1999 Adrian Sun (asun@u.washington.edu) 
@@ -26,7 +25,7 @@
 #ifdef HAVE_PAM_PAM_APPL_H
 #include <pam/pam_appl.h>
 #endif
-
+#include <arpa/inet.h>
 
 #if defined(GNUTLS_DHX)
 #include <gnutls/openssl.h>
@@ -58,14 +57,14 @@
 /* the secret key */
 static CAST_KEY castkey;
 static struct passwd *dhxpwd;
-static u_int8_t randbuf[KEYSIZE];
+static uint8_t randbuf[KEYSIZE];
 
 /* diffie-hellman bits */
 static unsigned char msg2_iv[] = "CJalbert";
 static unsigned char msg3_iv[] = "LWallace";
-static const u_int8_t p[] = {0xBA, 0x28, 0x73, 0xDF, 0xB0, 0x60, 0x57, 0xD4,
+static const uint8_t p[] = {0xBA, 0x28, 0x73, 0xDF, 0xB0, 0x60, 0x57, 0xD4,
 			     0x3F, 0x20, 0x24, 0x74, 0x4C, 0xEE, 0xE7, 0x5B};
-static const u_int8_t g = 0x07;
+static const uint8_t g = 0x07;
 
 
 /* Static variables used to communicate between the conversation function
@@ -80,7 +79,11 @@ static char *PAM_password;
  * echo off means password.
  */
 static int PAM_conv (int num_msg,
+#ifdef LINUX
                      const struct pam_message **msg,
+#else
+                     struct pam_message **msg,
+#endif
                      struct pam_response **resp,
                      void *appdata_ptr _U_) {
   int count = 0;
@@ -187,13 +190,13 @@ static struct pam_conv PAM_conversation = {
 static int dhx_setup(void *obj, char *ibuf, size_t ibuflen _U_, 
 		     char *rbuf, size_t *rbuflen)
 {
-    u_int16_t sessid;
+    uint16_t sessid;
     size_t i;
     BIGNUM *bn, *gbn, *pbn;
     DH *dh;
 
     /* get the client's public key */
-    if (!(bn = BN_bin2bn(ibuf, KEYSIZE, NULL))) {
+    if (!(bn = BN_bin2bn((unsigned char *)ibuf, KEYSIZE, NULL))) {
     /* Log Entry */
            LOG(log_info, logtype_uams, "uams_dhx_pam.c :PAM No Public Key -- %s",
 		  strerror(errno));
@@ -255,10 +258,10 @@ static int dhx_setup(void *obj, char *ibuf, size_t ibuflen _U_,
     }
 
     /* figure out the key. store the key in rbuf for now. */
-    i = DH_compute_key(rbuf, bn, dh);
+    i = DH_compute_key((unsigned char *)rbuf, bn, dh);
     
     /* set the key */
-    CAST_set_key(&castkey, i, rbuf);
+    CAST_set_key(&castkey, i, (unsigned char *)rbuf);
     
     /* session id. it's just a hashed version of the object pointer. */
     sessid = dhxhash(obj);
@@ -267,7 +270,7 @@ static int dhx_setup(void *obj, char *ibuf, size_t ibuflen _U_,
     *rbuflen += sizeof(sessid);
     
     /* public key */
-    BN_bn2bin(dh->pub_key, rbuf); 
+    BN_bn2bin(dh->pub_key, (unsigned char *)rbuf); 
     rbuf += KEYSIZE;
     *rbuflen += KEYSIZE;
 
@@ -301,7 +304,7 @@ static int dhx_setup(void *obj, char *ibuf, size_t ibuflen _U_,
 #endif /* 0 */
 
     /* encrypt using cast */
-    CAST_cbc_encrypt(rbuf, rbuf, CRYPTBUFLEN, &castkey, msg2_iv, 
+    CAST_cbc_encrypt((unsigned char *)rbuf, (unsigned char *)rbuf, CRYPTBUFLEN, &castkey, msg2_iv, 
 		     CAST_ENCRYPT);
     *rbuflen += CRYPTBUFLEN;
     BN_free(bn);
@@ -324,7 +327,7 @@ static int login(void *obj, char *username, int ulen,  struct passwd **uam_pwd _
 		     char *rbuf, size_t *rbuflen)
 {
     if (( dhxpwd = uam_getname(obj, username, ulen)) == NULL ) {
-        LOG(log_info, logtype_uams, "uams_dhx_pam.c: unknown username");
+        LOG(log_info, logtype_uams, "uams_dhx_pam.c: unknown username [%s]", username);
         return AFPERR_NOTAUTH;
     }
 
@@ -375,8 +378,9 @@ static int pam_login_ext(void *obj, char *uname, struct passwd **uam_pwd,
 		     char *rbuf, size_t *rbuflen)
 {
     char *username;
-    int len, ulen;
-    u_int16_t  temp16;
+    int len;
+    size_t ulen;
+    uint16_t  temp16;
 
     *rbuflen = 0;
 
@@ -412,7 +416,7 @@ static int pam_logincont(void *obj, struct passwd **uam_pwd,
 {
     const char *hostname;
     BIGNUM *bn1, *bn2, *bn3;
-    u_int16_t sessid;
+    uint16_t sessid;
     int err, PAM_error;
 
     *rbuflen = 0;
@@ -435,13 +439,13 @@ static int pam_logincont(void *obj, struct passwd **uam_pwd,
 	hostname = NULL;
 	}
 
-    CAST_cbc_encrypt(ibuf, rbuf, CRYPT2BUFLEN, &castkey,
+    CAST_cbc_encrypt((unsigned char *)ibuf, (unsigned char *)rbuf, CRYPT2BUFLEN, &castkey,
 		     msg3_iv, CAST_DECRYPT);
     memset(&castkey, 0, sizeof(castkey));
 
     /* check to make sure that the random number is the same. we
      * get sent back an incremented random number. */
-    if (!(bn1 = BN_bin2bn(rbuf, KEYSIZE, NULL)))
+    if (!(bn1 = BN_bin2bn((unsigned char *)rbuf, KEYSIZE, NULL)))
       return AFPERR_PARAM;
 
     if (!(bn2 = BN_bin2bn(randbuf, sizeof(randbuf), NULL))) {
@@ -572,7 +576,7 @@ static int pam_changepw(void *obj, char *username,
     char *hostname;
     pam_handle_t *lpamh;
     uid_t uid;
-    u_int16_t sessid;
+    uint16_t sessid;
     int PAM_error;
 
     if (ibuflen < sizeof(sessid)) {
@@ -612,13 +616,13 @@ static int pam_changepw(void *obj, char *username,
     }
 
     /* grab the client's nonce, old password, and new password. */
-    CAST_cbc_encrypt(ibuf, ibuf, CHANGEPWBUFLEN, &castkey,
+    CAST_cbc_encrypt((unsigned char *)ibuf, (unsigned char *)ibuf, CHANGEPWBUFLEN, &castkey,
 		     msg3_iv, CAST_DECRYPT);
     memset(&castkey, 0, sizeof(castkey));
 
     /* check to make sure that the random number is the same. we
      * get sent back an incremented random number. */
-    if (!(bn1 = BN_bin2bn(ibuf, KEYSIZE, NULL))) {
+    if (!(bn1 = BN_bin2bn((unsigned char *)ibuf, KEYSIZE, NULL))) {
     /* Log Entry */
            LOG(log_info, logtype_uams, "uams_dhx_pam.c :PAM: Random Number Not the same or not incremented-- %s",
 		  strerror(errno));

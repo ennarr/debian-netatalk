@@ -1,6 +1,4 @@
 /*
- * $Id: cnid_tdb_add.c,v 1.4 2009-11-20 17:37:14 didg Exp $
- *
  * Copyright (c) 1999. Adrian Sun (asun@zoology.washington.edu)
  * All Rights Reserved. See COPYRIGHT.
  *
@@ -40,12 +38,12 @@ static void make_devino_data(unsigned char *buf, dev_t dev, ino_t ino)
     buf[CNID_DEV_LEN + CNID_INO_LEN - 8] = ino;    
 }
 
-unsigned char *make_tdb_data(u_int32_t flags, const struct stat *st,const cnid_t did,
+unsigned char *make_tdb_data(uint32_t flags, const struct stat *st,const cnid_t did,
                      const char *name, const size_t len)
 {
     static unsigned char start[CNID_HEADER_LEN + MAXPATHLEN + 1];
     unsigned char *buf = start  +CNID_LEN;
-    u_int32_t i;
+    uint32_t i;
 
     if (len > MAXPATHLEN)
         return NULL;
@@ -95,7 +93,7 @@ static int add_cnid (struct _cnid_tdb_private *db, TDB_DATA *key, TDB_DATA *data
     }
 
     /* did/name database */
-    altkey.dptr = (char *) data->dptr +CNID_DID_OFS;
+    altkey.dptr = data->dptr +CNID_DID_OFS;
     altkey.dsize = data->dsize -CNID_DID_OFS;
     if (tdb_store(db->tdb_didname, altkey, altdata, TDB_REPLACE)) {
         goto abort;
@@ -114,7 +112,7 @@ static cnid_t get_cnid(struct _cnid_tdb_private *db)
     
     memset(&rootinfo_key, 0, sizeof(rootinfo_key));
     memset(&data, 0, sizeof(data));
-    rootinfo_key.dptr = ROOTINFO_KEY;
+    rootinfo_key.dptr = (unsigned char *)ROOTINFO_KEY;
     rootinfo_key.dsize = ROOTINFO_KEYLEN;
     
     tdb_chainlock(db->tdb_didname, rootinfo_key);  
@@ -138,7 +136,7 @@ static cnid_t get_cnid(struct _cnid_tdb_private *db)
     }
     
     memset(&data, 0, sizeof(data));
-    data.dptr = (char *)&hint;
+    data.dptr = (unsigned char *)&hint;
     data.dsize = sizeof(hint);
     if (tdb_store(db->tdb_didname, rootinfo_key, data, TDB_REPLACE)) {
         goto cleanup;
@@ -154,7 +152,7 @@ cleanup:
 
 /* ------------------------ */
 cnid_t cnid_tdb_add(struct _cnid_db *cdb, const struct stat *st,
-                     const cnid_t did, char *name, const size_t len, cnid_t hint)
+                    cnid_t did, const char *name, size_t len, cnid_t hint)
 {
     const struct stat *lstp;
     cnid_t id;
@@ -183,7 +181,7 @@ cnid_t cnid_tdb_add(struct _cnid_db *cdb, const struct stat *st,
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
 
-    key.dptr = (char *)&hint;
+    key.dptr = (unsigned char *)&hint;
     key.dsize = sizeof(cnid_t);
     if ((data.dptr = make_tdb_data(cdb->flags, lstp, did, name, len)) == NULL) {
         LOG(log_error, logtype_default, "tdb_add: Path name is too long");

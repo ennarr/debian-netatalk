@@ -1,5 +1,4 @@
 /*
- * $Id: dbd_resolve.c,v 1.4 2009-05-06 11:54:24 franklahm Exp $
  *
  * Copyright (C) Joerg Lenneis 2003
  * All Rights Reserved.  See COPYING.
@@ -12,7 +11,8 @@
 #include <string.h>
 #include <atalk/logger.h>
 #include <errno.h>
-#include <netatalk/endian.h>
+#include <arpa/inet.h>
+
 #include <atalk/cnid_dbd_private.h>
 
 #include "dbif.h"

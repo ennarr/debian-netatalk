@@ -14,9 +14,7 @@
 #include <netdb.h>
 #include <inttypes.h>
 #include <sys/types.h>
-
 #include <sys/param.h>
-#include <sys/cdefs.h>
 
 #include <atalk/fce_api.h>
 #include <atalk/util.h>
@@ -29,19 +27,8 @@ static char *fce_ev_names[] = {
     "FCE_FILE_DELETE",
     "FCE_DIR_DELETE",
     "FCE_FILE_CREATE",
-    "FCE_DIR_CREATE",
-    "FCE_TM_SIZE"
+    "FCE_DIR_CREATE"
 };
-
-// get sockaddr, IPv4 or IPv6:
-static void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
 
 static int unpack_fce_packet(unsigned char *buf, struct fce_packet *packet)
 {
@@ -65,6 +52,7 @@ static int unpack_fce_packet(unsigned char *buf, struct fce_packet *packet)
     packet->datalen = ntohs(packet->datalen);
 
     memcpy(&packet->data[0], p, packet->datalen);
+    packet->data[packet->datalen] = 0; /* 0 terminate strings */
     p += packet->datalen;
 
     return 0;
@@ -79,8 +67,6 @@ int main(void)
     struct sockaddr_storage their_addr;
     char buf[MAXBUFLEN];
     socklen_t addr_len;
-    char s[INET6_ADDRSTRLEN];
-    uint64_t tmsize;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
@@ -131,18 +117,11 @@ int main(void)
             exit(1);
         }
 
-        unpack_fce_packet(buf, &packet);
+        unpack_fce_packet((unsigned char *)buf, &packet);
 
         if (memcmp(packet.magic, FCE_PACKET_MAGIC, sizeof(packet.magic)) == 0) {
 
             switch (packet.mode) {
-            case FCE_TM_SIZE:
-                memcpy(&tmsize, packet.data, sizeof(uint64_t));
-                tmsize = ntoh64(tmsize);
-                printf("ID: %" PRIu32 ", Event: %s, Volume: %s, TM used size: %" PRIu64 " \n",
-                       packet.event_id, fce_ev_names[packet.mode], packet.data + sizeof(uint64_t), tmsize);
-                break;
-
             case FCE_CONN_START:
                 printf("FCE Start\n");
                 break;

@@ -1,5 +1,4 @@
 /*
- * $Id: nfsquota.c,v 1.13 2009-10-13 22:55:37 didg Exp $
  *
  * parts of this are lifted from the bsd quota program and are
  * therefore under the following copyright:
@@ -20,20 +19,7 @@
 
 #if !defined(NO_QUOTA_SUPPORT) && !defined(HAVE_LIBQUOTA)
 #include <stdio.h>
-/* STDC check */
-#if STDC_HEADERS
 #include <string.h>
-#else /* STDC_HEADERS */
-#ifndef HAVE_STRCHR
-#define strchr index
-#define strrchr index
-#endif /* HAVE_STRCHR */
-char *strchr (), *strrchr ();
-#ifndef HAVE_MEMCPY
-#define memcpy(d,s,n) bcopy ((s), (d), (n))
-#define memmove(d,s,n) bcopy ((s), (d), (n))
-#endif /* ! HAVE_MEMCPY */
-#endif /* STDC_HEADERS */
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h> /* for DEV_BSIZE */
@@ -104,7 +90,7 @@ callaurpc(struct vol *vol,
 #define GQR_RQUOTA getquota_rslt_u.gqr_rquota
 #endif /* USE_OLD_RQUOTA */
 
-int getnfsquota(struct vol *vol, const int uid, const u_int32_t bsize,
+int getnfsquota(struct vol *vol, const int uid, const uint32_t bsize,
                 struct dqblk *dqp)
 {
 

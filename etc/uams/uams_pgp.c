@@ -1,5 +1,4 @@
 /*
- * $Id: uams_pgp.c,v 1.12 2009-10-15 11:39:48 didg Exp $
  *
  * Copyright (c) 1990,1993 Regents of The University of Michigan.
  * Copyright (c) 1999 Adrian Sun (asun@u.washington.edu) 
@@ -53,7 +52,7 @@
 /* the secret key */
 static struct passwd *pgppwd;
 static CAST_KEY castkey;
-static u_int8_t randbuf[16];
+static uint8_t randbuf[16];
 
 /* pgp passwd */
 static int pgp_login(void *obj, struct passwd **uam_pwd,
@@ -109,7 +108,7 @@ static int pgp_logincont(void *obj, struct passwd **uam_pwd,
 {
 	unsigned char iv[] = "RJscorat";
     BIGNUM *bn1, *bn2, *bn3;
-    u_int16_t sessid;
+    uint16_t sessid;
     char *p;
 
     *rbuflen = 0;

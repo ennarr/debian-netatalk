@@ -1,7 +1,3 @@
-/*
- * $Id: cnid_tdb_lookup.c,v 1.6 2009-11-21 11:12:49 didg Exp $
- */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -11,7 +7,7 @@
 #include "cnid_tdb.h"
 #include <atalk/logger.h>
 
-cnid_t cnid_tdb_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t did, char *name, const size_t len)
+cnid_t cnid_tdb_lookup(struct _cnid_db *cdb, const struct stat *st, cnid_t did, const char *name, size_t len)
 {
     char *buf;
     struct _cnid_tdb_private *db;
@@ -19,9 +15,9 @@ cnid_t cnid_tdb_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t
     int devino = 1, didname = 1;
     char dev[CNID_DEV_LEN];
     char ino[CNID_INO_LEN];  
-    u_int32_t type_devino  = (unsigned)-1;
-    u_int32_t type_didname = (unsigned)-1;
-    u_int32_t type;
+    uint32_t type_devino  = (unsigned)-1;
+    uint32_t type_didname = (unsigned)-1;
+    uint32_t type;
     int update = 0;
     cnid_t id_devino = 0, id_didname = 0,id = 0;
 
@@ -29,7 +25,7 @@ cnid_t cnid_tdb_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t
         return 0;
     }
 
-    if ((buf = make_tdb_data(cdb->flags, st, did, name, len)) == NULL) {
+    if ((buf = (char *)make_tdb_data(cdb->flags, st, did, name, len)) == NULL) {
         LOG(log_error, logtype_default, "tdb_lookup: Pathname is too long");
         return 0;
     }
@@ -46,7 +42,7 @@ cnid_t cnid_tdb_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t
     memcpy(dev, buf + CNID_DEV_OFS, CNID_DEV_LEN);
     memcpy(ino, buf + CNID_INO_OFS, CNID_INO_LEN);
 
-    key.dptr = buf +CNID_DEVINO_OFS;
+    key.dptr = (unsigned char *)buf + CNID_DEVINO_OFS;
     key.dsize  = CNID_DEVINO_LEN;
     cniddata = tdb_fetch(db->tdb_devino, key);
     if (!cniddata.dptr) {
@@ -70,7 +66,7 @@ cnid_t cnid_tdb_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t
     }
 
     /* did/name now */
-    key.dptr = buf + CNID_DID_OFS;
+    key.dptr = (unsigned char *)buf + CNID_DID_OFS;
     key.dsize = CNID_DID_LEN + len + 1;
     cniddata = tdb_fetch(db->tdb_didname, key);
     if (!cniddata.dptr) {

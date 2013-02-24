@@ -1,5 +1,4 @@
 /*
-   $Id: cache.h,v 1.1 2009-02-02 11:55:01 franklahm Exp $
    Copyright (c) 2008,2009 Frank Lahm <franklahm@gmail.com>
 
    This program is free software; you can redistribute it and/or modify
@@ -32,7 +31,7 @@
  * Interface
  ********************************************************/
 
-extern int search_cachebyname( const char *name, uuidtype_t *type, uuidp_t uuid);
+extern int search_cachebyname( const char *name, uuidtype_t *type, unsigned char *uuid);
 extern int add_cachebyname( const char *inname, const uuidp_t inuuid, const uuidtype_t type, const unsigned long uid);
 extern int search_cachebyuuid( uuidp_t uuidp, char **name, uuidtype_t *type);
 extern int add_cachebyuuid( uuidp_t inuuid, const char *inname, uuidtype_t type, const unsigned long uid);

@@ -30,15 +30,15 @@
 typedef struct cacheduser {
     unsigned long uid;      /* for future use */
     uuidtype_t type;
-    uuidp_t uuid;
+    unsigned char *uuid;
     char *name;
     time_t creationtime;
     struct cacheduser *prev;
     struct cacheduser *next;
 } cacheduser_t;
 
-cacheduser_t *namecache[256];   /* indexed by hash of name */
-cacheduser_t *uuidcache[256];   /* indexed by hash of uuid */
+static cacheduser_t *namecache[256];   /* indexed by hash of name */
+static cacheduser_t *uuidcache[256];   /* indexed by hash of uuid */
 
 /********************************************************
  * helper function
@@ -46,7 +46,6 @@ cacheduser_t *uuidcache[256];   /* indexed by hash of uuid */
 
 void uuidcache_dump(void) {
     int i;
-    int ret = 0;
     cacheduser_t *entry;
     char timestr[200];
     struct tm *tmp = NULL;
@@ -127,7 +126,7 @@ static unsigned char hashuuid(uuidp_t uuid) {
 int add_cachebyname( const char *inname, const uuidp_t inuuid, const uuidtype_t type, const unsigned long uid _U_) {
     int ret = 0;
     char *name = NULL;
-    uuidp_t uuid = NULL;
+    unsigned char *uuid = NULL;
     cacheduser_t *cacheduser = NULL;
     unsigned char hash;
 
@@ -200,7 +199,7 @@ cleanup:
  * @returns       0 on sucess, entry found
  *                -1 no entry found
  */
-int search_cachebyname(const char *name, uuidtype_t *type, uuidp_t uuid) {
+int search_cachebyname( const char *name, uuidtype_t *type, unsigned char *uuid) {
     int ret;
     unsigned char hash;
     cacheduser_t *entry;
@@ -299,9 +298,8 @@ int search_cachebyuuid( uuidp_t uuidp, char **name, uuidtype_t *type) {
 int add_cachebyuuid( uuidp_t inuuid, const char *inname, uuidtype_t type, const unsigned long uid _U_) {
     int ret = 0;
     char *name = NULL;
-    uuidp_t uuid = NULL;
+    unsigned char *uuid = NULL;
     cacheduser_t *cacheduser = NULL;
-    cacheduser_t *entry;
     unsigned char hash;
 
     /* allocate mem and copy values */

@@ -46,7 +46,7 @@ static gcry_mpi_t p, g, Ra;
 static gcry_mpi_t serverNonce;
 static char *K_MD5hash = NULL;
 static int K_hash_len;
-static u_int16_t ID;
+static uint16_t ID;
 
 /* The initialization vectors for CAST128 are fixed by Apple. */
 static unsigned char dhx_c2siv[] = { 'L', 'W', 'a', 'l', 'l', 'a', 'c', 'e' };
@@ -136,7 +136,11 @@ error:
  * echo off means password.
  */
 static int PAM_conv (int num_msg,
+#ifdef LINUX
                      const struct pam_message **msg,
+#else
+                     struct pam_message **msg,
+#endif
                      struct pam_response **resp,
                      void *appdata_ptr _U_) {
     int count = 0;
@@ -242,6 +246,7 @@ static int dhx2_setup(void *obj, char *ibuf _U_, size_t ibuflen _U_,
     size_t nwritten;
     gcry_mpi_t Ma;
     char *Ra_binary = NULL;
+    uint16_t uint16;
 
     *rbuflen = 0;
 
@@ -267,7 +272,8 @@ static int dhx2_setup(void *obj, char *ibuf _U_, size_t ibuflen _U_,
 
     /* Session ID first */
     ID = dhxhash(obj);
-    *(u_int16_t *)rbuf = htons(ID);
+    uint16 = htons(ID);
+    memcpy(rbuf, &uint16, sizeof(uint16_t));
     rbuf += 2;
     *rbuflen += 2;
 
@@ -281,7 +287,9 @@ static int dhx2_setup(void *obj, char *ibuf _U_, size_t ibuflen _U_,
     *rbuflen += 4;
 
     /* len = length of p = PRIMEBITS/8 */
-    *(u_int16_t *)rbuf = htons((u_int16_t) PRIMEBITS/8);
+
+    uint16 = htons((uint16_t) PRIMEBITS/8);
+    memcpy(rbuf, &uint16, sizeof(uint16_t));
     rbuf += 2;
     *rbuflen += 2;
 
@@ -365,7 +373,7 @@ static int pam_login_ext(void *obj, char *uname, struct passwd **uam_pwd,
 {
     char *username;
     size_t len, ulen;
-    u_int16_t  temp16;
+    uint16_t  temp16;
 
     *rbuflen = 0;
 
@@ -403,6 +411,7 @@ static int logincont1(void *obj _U_, char *ibuf, size_t ibuflen, char *rbuf, siz
     char serverNonce_bin[16];
     gcry_cipher_hd_t ctx;
     gcry_error_t ctxerror;
+    uint16_t uint16;
 
     *rbuflen = 0;
 
@@ -488,7 +497,8 @@ static int logincont1(void *obj _U_, char *ibuf, size_t ibuflen, char *rbuf, siz
     /* ---- Start building reply packet ---- */
 
     /* Session ID + 1 first */
-    *(u_int16_t *)rbuf = htons(ID+1);
+    uint16 = htons(ID+1);
+    memcpy(rbuf, &uint16, sizeof(uint16_t));
     rbuf += 2;
     *rbuflen += 2;
 
@@ -647,6 +657,7 @@ static int logincont2(void *obj_in, struct passwd **uam_pwd,
     /* solaris craps out if PAM_TTY and PAM_RHOST aren't set. */
     pam_set_item(pamh, PAM_TTY, "afpd");
     pam_set_item(pamh, PAM_RHOST, hostname);
+    pam_set_item(pamh, PAM_RUSER, PAM_username);
 
     PAM_error = pam_authenticate(pamh, 0);
     if (PAM_error != PAM_SUCCESS) {
@@ -714,11 +725,12 @@ static int pam_logincont(void *obj, struct passwd **uam_pwd,
                          char *ibuf, size_t ibuflen,
                          char *rbuf, size_t *rbuflen)
 {
-    u_int16_t retID;
+    uint16_t retID;
     int ret;
 
     /* check for session id */
-    retID = ntohs(*(u_int16_t *)ibuf);
+    memcpy(&retID, ibuf, sizeof(uint16_t));
+    retID = ntohs(retID);
     if (retID == ID)
         ret = logincont1(obj, ibuf, ibuflen, rbuf, rbuflen);
     else if (retID == ID+1)
@@ -919,9 +931,6 @@ static int uam_setup(const char *path)
     if (uam_register(UAM_SERVER_CHANGEPW, path, "DHX2", dhx2_changepw) < 0)
         return -1;
 
-    p = gcry_mpi_new(0);
-    g = gcry_mpi_new(0);
-
     LOG(log_debug, logtype_uams, "DHX2: generating mersenne primes");
     /* Generate p and g for DH */
     if (dh_params_generate(PRIMEBITS) != 0) {
@@ -936,6 +945,8 @@ static void uam_cleanup(void)
 {
     uam_unregister(UAM_SERVER_LOGIN, "DHX2");
     uam_unregister(UAM_SERVER_CHANGEPW, "DHX2");
+
+    LOG(log_debug, logtype_uams, "DHX2: uam_cleanup");
 
     gcry_mpi_release(p);
     gcry_mpi_release(g);

@@ -1,5 +1,4 @@
 /*
- * $Id: dsi_attn.c,v 1.8 2009-10-25 06:13:11 didg Exp $
  *
  * Copyright (c) 1997 Adrian Sun (asun@zoology.washington.edu)
  * All rights reserved. See COPYRIGHT.
@@ -13,10 +12,10 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 
 #include <atalk/dsi.h>
 #include <atalk/afp.h>
-#include <netatalk/endian.h>
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -31,8 +30,8 @@ int dsi_attention(DSI *dsi, AFPUserBytes flags)
 {
   /* header + AFPUserBytes */
   char block[DSI_BLOCKSIZ + sizeof(AFPUserBytes)];
-  u_int32_t len, nlen;
-  u_int16_t id;
+  uint32_t len, nlen;
+  uint16_t id;
 
   if (dsi->flags & DSI_SLEEPING)
       return 1;

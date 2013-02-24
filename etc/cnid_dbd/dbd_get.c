@@ -1,5 +1,4 @@
 /*
- * $Id: dbd_get.c,v 1.4 2009-05-06 11:54:24 franklahm Exp $
  *
  * Copyright (C) Joerg Lenneis 2003
  * All Rights Reserved.  See COPYING.
@@ -13,7 +12,8 @@
 #include <sys/param.h>
 #include <atalk/logger.h>
 #include <errno.h>
-#include <netatalk/endian.h>
+#include <arpa/inet.h>
+
 #include <atalk/cnid_dbd_private.h>
 
 

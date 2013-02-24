@@ -9,9 +9,7 @@
 #endif 
 
 #include <sys/types.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,8 +69,8 @@ static int ipc_kill_token(struct ipc_header *ipc, server_child *children)
 /* ----------------- */
 static int ipc_get_session(struct ipc_header *ipc, server_child *children)
 {
-    u_int32_t boottime;
-    u_int32_t idlen;
+    uint32_t boottime;
+    uint32_t idlen;
     char     *clientid, *p;
 
     
@@ -269,8 +267,6 @@ int ipc_server_read(server_child *children, int fd)
     LOG(log_debug, logtype_afpd, "ipc_server_read(%s): pid: %u",
         ipc_cmd_str[ipc.command], ipc.child_pid); 
 
-    int afp_socket;
-
     switch (ipc.command) {
 
 	case IPC_DISCOLDSESSION:
@@ -349,4 +345,3 @@ int ipc_child_write(int fd, uint16_t command, int len, void *msg)
 
    return 0;
 }
-

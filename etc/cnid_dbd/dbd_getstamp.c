@@ -1,6 +1,5 @@
 
 /*
- * $Id: dbd_getstamp.c,v 1.4 2009-05-06 11:54:24 franklahm Exp $
  *
  * Copyright (C) Joerg Lenneis 2003
  * All Rights Reserved.  See COPYING.
@@ -13,7 +12,8 @@
 #include <string.h>
 #include <atalk/logger.h>
 #include <errno.h>
-#include <netatalk/endian.h>
+#include <arpa/inet.h>
+
 #include <atalk/cnid_dbd_private.h>
 
 #include "dbif.h"
@@ -50,10 +50,6 @@ int dbd_getstamp(DBD *dbd, struct cnid_dbd_rqst *rqst _U_, struct cnid_dbd_rply 
     
     rply->namelen = CNID_DEV_LEN;
     rply->name = (char *)data.data + CNID_DEV_OFS;
-    
-
-    LOG(log_debug, logtype_cnid, "cnid_getstamp: Returning stamp '%08x'", *(uint32_t *)rply->name);
-
     rply->result = CNID_DBD_RES_OK;
     return 1;
 }

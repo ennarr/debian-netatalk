@@ -1,5 +1,4 @@
 /*
- * $Id: dsi_getstat.c,v 1.4 2005-09-07 15:27:29 didg Exp $
  *
  * Copyright (c) 1997 Adrian Sun (asun@zoology.washington.edu)
  * All rights reserved. See COPYRIGHT.
@@ -11,9 +10,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include <atalk/dsi.h>
-#include <netatalk/endian.h>
 
 /* return the status and then delete the connection. most of the
  * fields are already set. */

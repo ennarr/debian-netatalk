@@ -1,7 +1,3 @@
-/*
- * $Id: cnid_tdb_update.c,v 1.6 2009-11-21 11:12:49 didg Exp $
- */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -11,9 +7,8 @@
 #include "cnid_tdb.h"
 #include <atalk/logger.h>
 
-int cnid_tdb_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st,
-                     const cnid_t did, char *name, const size_t len
-                     /*, const char *info, const int infolen */ )
+int cnid_tdb_update(struct _cnid_db *cdb, cnid_t id, const struct stat *st,
+                    cnid_t did, const char *name, size_t len)
 {
     struct _cnid_tdb_private *db;
     TDB_DATA key, data, altdata;
@@ -43,7 +38,7 @@ int cnid_tdb_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st
         free(altdata.dptr);
 
         if (data.dptr) {
-            key.dptr = (char *)data.dptr +CNID_DID_OFS;
+            key.dptr = (unsigned char *)data.dptr +CNID_DID_OFS;
             key.dsize = data.dsize - CNID_DID_OFS;
             tdb_delete(db->tdb_didname, key); 
         
@@ -54,7 +49,7 @@ int cnid_tdb_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st
     /* search by did/name */
     data.dptr = make_tdb_data(cdb->flags, st, did, name, len);
     data.dsize = CNID_HEADER_LEN + len + 1;
-    key.dptr = (char *)data.dptr +CNID_DID_OFS;
+    key.dptr = (unsigned char *)data.dptr +CNID_DID_OFS;
     key.dsize = data.dsize - CNID_DID_OFS;
     altdata = tdb_fetch(db->tdb_didname, key);
     if (altdata.dptr) {
@@ -81,7 +76,7 @@ int cnid_tdb_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st
     memcpy(data.dptr, &id, sizeof(id));
 
     /* Update the old CNID with the new info. */
-    key.dptr = (char *) &id;
+    key.dptr = (unsigned char *) &id;
     key.dsize = sizeof(id);
     if (tdb_store(db->tdb_cnid, key, data, TDB_REPLACE)) {
         goto update_err;
@@ -90,13 +85,13 @@ int cnid_tdb_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st
     /* Put in a new dev/ino mapping. */
     key.dptr = data.dptr +CNID_DEVINO_OFS;
     key.dsize = CNID_DEVINO_LEN;
-    altdata.dptr  = (char *) &id;
+    altdata.dptr  = (unsigned char *) &id;
     altdata.dsize = sizeof(id);
     if (tdb_store(db->tdb_devino, key, altdata, TDB_REPLACE)) {
         goto update_err;
     }
     /* put in a new did/name mapping. */
-    key.dptr = (char *) data.dptr +CNID_DID_OFS;
+    key.dptr = (unsigned char *) data.dptr +CNID_DID_OFS;
     key.dsize = data.dsize -CNID_DID_OFS;
 
     if (tdb_store(db->tdb_didname, key, altdata, TDB_REPLACE)) {

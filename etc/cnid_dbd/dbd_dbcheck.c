@@ -1,5 +1,4 @@
 /*
- * $Id: dbd_dbcheck.c,v 1.4 2009-05-06 11:54:24 franklahm Exp $
  *
  * Copyright (C) Joerg Lenneis 2003
  * All Rights Reserved.  See COPYING.
@@ -9,12 +8,12 @@
 #include "config.h"
 #endif /* HAVE_CONFIG_H */
 
-
 #include <stdio.h>
 #include <string.h>
 #include <sys/param.h>
 #include <errno.h>
-#include <netatalk/endian.h>
+#include <arpa/inet.h>
+
 #include <atalk/logger.h>
 #include <atalk/cnid_dbd_private.h>
 

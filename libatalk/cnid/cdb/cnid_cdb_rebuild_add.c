@@ -1,5 +1,4 @@
 /*
- * $Id: cnid_cdb_rebuild_add.c,v 1.6 2009-11-20 17:22:11 didg Exp $
  *
  * All Rights Reserved. See COPYRIGHT.
  *
@@ -73,10 +72,8 @@ cleanup:
     return CNID_INVALID;
 }
 
-/* ------------------------ */
 cnid_t cnid_cdb_rebuild_add(struct _cnid_db *cdb, const struct stat *st,
-                const cnid_t did, char *name, const size_t len, 
-		cnid_t hint)
+                            cnid_t did, const char *name, size_t len, cnid_t hint)
 {
     CNID_private *db;
     DBT key, data;

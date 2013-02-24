@@ -11,15 +11,8 @@
 #ifdef CNID_BACKEND_DBD
 
 #include <stdlib.h>
-#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
-#endif /* HAVE_SYS_STAT_H */
-#ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
-#endif /* HAVE_SYS_UIO_H */
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
-#endif
 #include <sys/time.h>
 #include <sys/un.h>
 #include <sys/socket.h>
@@ -33,8 +26,8 @@
 #include <errno.h>
 #include <netdb.h>
 #include <time.h>
+#include <arpa/inet.h>
 
-#include <netatalk/endian.h>
 #include <atalk/logger.h>
 #include <atalk/adouble.h>
 #include <atalk/cnid.h>
@@ -78,7 +71,9 @@ static int tsock_getfd(const char *host, const char *port)
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
+#ifdef AI_NUMERICSERV
     hints.ai_flags = AI_NUMERICSERV;
+#endif
 
     if ((err = getaddrinfo(host, port, &hints, &servinfo)) != 0) {
         LOG(log_error, logtype_default, "tsock_getfd: getaddrinfo: CNID server %s:%s : %s\n",
@@ -273,7 +268,7 @@ static int send_packet(CNID_private *db, struct cnid_dbd_rqst *rqst)
     vecs = 1;
 
     if (rqst->namelen) {
-        iov[1].iov_base = rqst->name;
+        iov[1].iov_base = (char *)rqst->name;
         iov[1].iov_len  = rqst->namelen;
         towrite += rqst->namelen;
         vecs++;
@@ -361,47 +356,18 @@ static int transmit(CNID_private *db, struct cnid_dbd_rqst *rqst, struct cnid_db
     time_t orig, t;
     int clean = 1; /* no errors so far - to prevent sleep on first try */
 
-    if (db->changed) {
-        /* volume and db don't have the same timestamp
-         */
-        return -1;
-    }
     while (1) {
         if (db->fd == -1) {
-            struct cnid_dbd_rqst rqst_stamp;
-            struct cnid_dbd_rply rply_stamp;
-            char  stamp[ADEDLEN_PRIVSYN];
-
             LOG(log_maxdebug, logtype_cnid, "transmit: connecting to cnid_dbd ...");
             if ((db->fd = init_tsock(db)) < 0) {
                 goto transmit_fail;
             }
-            dbd_initstamp(&rqst_stamp);
-            memset(stamp, 0, ADEDLEN_PRIVSYN);
-            rply_stamp.name = stamp;
-            rply_stamp.namelen = ADEDLEN_PRIVSYN;
-
-            if (dbd_rpc(db, &rqst_stamp, &rply_stamp) < 0)
-                goto transmit_fail;
-            if (dbd_reply_stamp(&rply_stamp ) < 0)
-                goto transmit_fail;
-
             if (db->notfirst) {
-                LOG(log_debug7, logtype_cnid, "transmit: reconnected to cnid_dbd, comparing database stamps...");
-                if (memcmp(stamp, db->stamp, ADEDLEN_PRIVSYN)) {
-                    LOG(log_error, logtype_cnid, "transmit: ... not the same db!");
-                    db->changed = 1;
-                    return -1;
-                }
-                LOG(log_debug7, logtype_cnid, "transmit: ... OK.");
+                LOG(log_debug7, logtype_cnid, "transmit: reconnected to cnid_dbd");
             } else { /* db->notfirst == 0 */
                 db->notfirst = 1;
-                if (db->client_stamp)
-                    memcpy(db->client_stamp, stamp, ADEDLEN_PRIVSYN);
-                memcpy(db->stamp, stamp, ADEDLEN_PRIVSYN);
             }
-            LOG(log_debug, logtype_cnid, "transmit: attached to '%s', stamp: '%08lx'.",
-                db->db_dir, *(uint64_t *)stamp);
+            LOG(log_debug, logtype_cnid, "transmit: attached to '%s'", db->db_dir);
         }
         if (!dbd_rpc(db, rqst, rply)) {
             LOG(log_maxdebug, logtype_cnid, "transmit: {done}");
@@ -461,7 +427,7 @@ static struct _cnid_db *cnid_dbd_new(const char *volpath)
     cdb->cnid_update = cnid_dbd_update;
     cdb->cnid_rebuild_add = cnid_dbd_rebuild_add;
     cdb->cnid_close = cnid_dbd_close;
-
+    cdb->cnid_wipe = cnid_dbd_wipe;
     return cdb;
 }
 
@@ -536,10 +502,35 @@ void cnid_dbd_close(struct _cnid_db *cdb)
     return;
 }
 
+/**
+ * Get the db stamp
+ **/
+static int cnid_dbd_stamp(CNID_private *db)
+{
+    struct cnid_dbd_rqst rqst_stamp;
+    struct cnid_dbd_rply rply_stamp;
+    char  stamp[ADEDLEN_PRIVSYN];
+
+    dbd_initstamp(&rqst_stamp);
+    memset(stamp, 0, ADEDLEN_PRIVSYN);
+    rply_stamp.name = stamp;
+    rply_stamp.namelen = ADEDLEN_PRIVSYN;
+
+    if (transmit(db, &rqst_stamp, &rply_stamp) < 0)
+        return -1;
+    if (dbd_reply_stamp(&rply_stamp ) < 0)
+        return -1;
+
+    if (db->client_stamp)
+        memcpy(db->client_stamp, stamp, ADEDLEN_PRIVSYN);
+    memcpy(db->stamp, stamp, ADEDLEN_PRIVSYN);
+
+    return 0;
+}
+
 /* ---------------------- */
 cnid_t cnid_dbd_add(struct _cnid_db *cdb, const struct stat *st,
-                    const cnid_t did, char *name, const size_t len,
-                    cnid_t hint)
+                    cnid_t did, const char *name, size_t len, cnid_t hint)
 {
     CNID_private *db;
     struct cnid_dbd_rqst rqst;
@@ -572,8 +563,8 @@ cnid_t cnid_dbd_add(struct _cnid_db *cdb, const struct stat *st,
     rqst.name = name;
     rqst.namelen = len;
 
-    LOG(log_debug, logtype_cnid, "cnid_dbd_add: CNID: %u, name: '%s', inode: 0x%llx, type: %d (0=file, 1=dir)",
-        ntohl(did), name, (long long)st->st_ino, rqst.type);
+    LOG(log_debug, logtype_cnid, "cnid_dbd_add: CNID: %u, name: '%s', dev: 0x%llx, inode: 0x%llx, type: %s",
+        ntohl(did), name, (long long)rqst.dev, (long long)st->st_ino, rqst.type ? "dir" : "file");
 
     rply.namelen = 0;
     if (transmit(db, &rqst, &rply) < 0) {
@@ -603,7 +594,7 @@ cnid_t cnid_dbd_add(struct _cnid_db *cdb, const struct stat *st,
 }
 
 /* ---------------------- */
-cnid_t cnid_dbd_get(struct _cnid_db *cdb, const cnid_t did, char *name, const size_t len)
+cnid_t cnid_dbd_get(struct _cnid_db *cdb, cnid_t did, const char *name, size_t len)
 {
     CNID_private *db;
     struct cnid_dbd_rqst rqst;
@@ -712,7 +703,9 @@ char *cnid_dbd_resolve(struct _cnid_db *cdb, cnid_t *id, void *buffer, size_t le
     return name;
 }
 
-/* ---------------------- */
+/**
+ * Caller passes buffer where we will store the db stamp
+ **/
 int cnid_dbd_getstamp(struct _cnid_db *cdb, void *buffer, const size_t len)
 {
     CNID_private *db;
@@ -724,13 +717,13 @@ int cnid_dbd_getstamp(struct _cnid_db *cdb, void *buffer, const size_t len)
     }
     db->client_stamp = buffer;
     db->stamp_size = len;
-    memset(buffer,0, len);
-    return 0;
+
+    return cnid_dbd_stamp(db);
 }
 
 /* ---------------------- */
-cnid_t cnid_dbd_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t did,
-                       char *name, const size_t len)
+cnid_t cnid_dbd_lookup(struct _cnid_db *cdb, const struct stat *st, cnid_t did,
+                       const char *name, size_t len)
 {
     CNID_private *db;
     struct cnid_dbd_rqst rqst;
@@ -791,7 +784,7 @@ cnid_t cnid_dbd_lookup(struct _cnid_db *cdb, const struct stat *st, const cnid_t
 }
 
 /* ---------------------- */
-int cnid_dbd_find(struct _cnid_db *cdb, char *name, size_t namelen, void *buffer, size_t buflen)
+int cnid_dbd_find(struct _cnid_db *cdb, const char *name, size_t namelen, void *buffer, size_t buflen)
 {
     CNID_private *db;
     struct cnid_dbd_rqst rqst;
@@ -846,8 +839,8 @@ int cnid_dbd_find(struct _cnid_db *cdb, char *name, size_t namelen, void *buffer
 }
 
 /* ---------------------- */
-int cnid_dbd_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st,
-                    const cnid_t did, char *name, const size_t len)
+int cnid_dbd_update(struct _cnid_db *cdb, cnid_t id, const struct stat *st,
+                    cnid_t did, const char *name, size_t len)
 {
     CNID_private *db;
     struct cnid_dbd_rqst rqst;
@@ -901,8 +894,7 @@ int cnid_dbd_update(struct _cnid_db *cdb, const cnid_t id, const struct stat *st
 
 /* ---------------------- */
 cnid_t cnid_dbd_rebuild_add(struct _cnid_db *cdb, const struct stat *st,
-                            const cnid_t did, char *name, const size_t len,
-                            cnid_t hint)
+                            cnid_t did, const char *name, size_t len, cnid_t hint)
 {
     CNID_private *db;
     struct cnid_dbd_rqst rqst;
@@ -999,6 +991,39 @@ int cnid_dbd_delete(struct _cnid_db *cdb, const cnid_t id)
     default:
         abort();
     }
+}
+
+int cnid_dbd_wipe(struct _cnid_db *cdb)
+{
+    CNID_private *db;
+    struct cnid_dbd_rqst rqst;
+    struct cnid_dbd_rply rply;
+
+    if (!cdb || !(db = cdb->_private)) {
+        LOG(log_error, logtype_cnid, "cnid_wipe: Parameter error");
+        errno = CNID_ERR_PARAM;
+        return -1;
+    }
+
+    LOG(log_debug, logtype_cnid, "cnid_dbd_wipe");
+
+    RQST_RESET(&rqst);
+    rqst.op = CNID_DBD_OP_WIPE;
+    rqst.cnid = 0;
+
+    rply.namelen = 0;
+    if (transmit(db, &rqst, &rply) < 0) {
+        errno = CNID_ERR_DB;
+        return -1;
+    }
+
+    if (rply.result != CNID_DBD_RES_OK) {
+        errno = CNID_ERR_DB;
+        return -1;
+    }
+    LOG(log_debug, logtype_cnid, "cnid_dbd_wipe: ok");
+
+    return cnid_dbd_stamp(db);
 }
 
 
