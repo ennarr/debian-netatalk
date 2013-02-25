@@ -1,3 +1,22 @@
+netatalk (3.0.2-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+  * New ini style configuration file afp.conf which replaces all 
+    previous configuration files.
+  * New default AppleDouble backend using filesystem Extended Attributes,
+    conversion from AppleDouble v2 is done automatically on access.
+  * New service controller process "netatalk" responsible for starting
+    and restarting afpd and cnid_metad as necessary.
+  * AppleTalk support has been removed.
+  * Coherent cross-platform locking with Solaris CIFS server.
+  * Fix up binary locations by removing --enable-fhs configure option
+  * Adding configure option and depends to use external libevent
+  * Remove patches 101, 201, 202 and 205 as no longer required
+  * Clean up files removed upstream
+  * /var/spool/netatalk replaced with /var/netatalk
+
+ -- Nigel Roberts <nigel@nobiscuit.com>  Sun, 24 Feb 2013 12:30:05 +0000
+
 netatalk (2.2.2-1) unstable; urgency=low
 
   * New upstream release.
