@@ -159,11 +159,19 @@ CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CRYPT_LIBS = @CRYPT_LIBS@
 CYGPATH_W = @CYGPATH_W@
+DBUS_CFLAGS = @DBUS_CFLAGS@
+DBUS_GLIB_CFLAGS = @DBUS_GLIB_CFLAGS@
+DBUS_GLIB_LIBS = @DBUS_GLIB_LIBS@
+DBUS_GTHREAD_CFLAGS = @DBUS_GTHREAD_CFLAGS@
+DBUS_GTHREAD_LIBS = @DBUS_GTHREAD_LIBS@
+DBUS_LIBS = @DBUS_LIBS@
+DBUS_SYS_DIR = @DBUS_SYS_DIR@
 DEFAULT_CNID_SCHEME = @DEFAULT_CNID_SCHEME@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
+DTRACE_LIBS = @DTRACE_LIBS@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
@@ -177,6 +185,7 @@ GSSAPI_LDFLAGS = @GSSAPI_LDFLAGS@
 GSSAPI_LIBS = @GSSAPI_LIBS@
 ICONV_CFLAGS = @ICONV_CFLAGS@
 ICONV_LIBS = @ICONV_LIBS@
+INIT_DIR = @INIT_DIR@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -237,6 +246,7 @@ PAM_DIRECTIVE = @PAM_DIRECTIVE@
 PAM_LIBS = @PAM_LIBS@
 PAM_PASSWORD = @PAM_PASSWORD@
 PAM_SESSION = @PAM_SESSION@
+PATH_NETATALK_LOCK = @PATH_NETATALK_LOCK@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PERL = @PERL@
 PKGCONFDIR = @PKGCONFDIR@
@@ -271,6 +281,7 @@ am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
 am__tar = @am__tar@
 am__untar = @am__untar@
+atalk_cv_have_dtrace = @atalk_cv_have_dtrace@
 ax_pthread_config = @ax_pthread_config@
 bindir = @bindir@
 build = @build@
@@ -352,27 +363,27 @@ noinst_DATA = $(GENERATED_FILES)
 #
 # checking for "Debian" style sysv scripts:
 #
-@USE_DEBIAN_TRUE@sysvdir = /etc/init.d
+@USE_DEBIAN_TRUE@sysvdir = $(INIT_DIR)
 
 #
 # checking for "Gentoo" style sysv scripts:
 #
-@USE_GENTOO_TRUE@sysvdir = /etc/init.d
+@USE_GENTOO_TRUE@sysvdir = $(INIT_DIR)
 
 #
 # checking for NetBSD init scripts
 #
-@USE_NETBSD_TRUE@sysvdir = /etc/rc.d
+@USE_NETBSD_TRUE@sysvdir = $(INIT_DIR)
 
 #
 # checking for "redhat" style sysv scripts:
 #
-@USE_REDHAT_SYSV_TRUE@sysvdir = /etc/rc.d/init.d
+@USE_REDHAT_SYSV_TRUE@sysvdir = $(INIT_DIR)
 
 #
 # checking for "SuSE" style sysv scripts:
 #
-@USE_SUSE_SYSV_TRUE@sysvdir = /etc/init.d
+@USE_SUSE_SYSV_TRUE@sysvdir = $(INIT_DIR)
 @USE_DEBIAN_TRUE@sysv_SCRIPTS = netatalk
 @USE_GENTOO_TRUE@sysv_SCRIPTS = netatalk
 @USE_NETBSD_TRUE@sysv_SCRIPTS = netatalk
@@ -382,12 +393,12 @@ noinst_DATA = $(GENERATED_FILES)
 #
 # checking for Solaris init scripts
 #
-@USE_SOLARIS_TRUE@servicedir = /lib/svc/manifest/network/
+@USE_SOLARIS_TRUE@servicedir = $(INIT_DIR)
 
 #
 # checking for general systemd scripts:
 #
-@USE_SYSTEMD_TRUE@servicedir = /lib/systemd/system
+@USE_SYSTEMD_TRUE@servicedir = $(INIT_DIR)
 @USE_SOLARIS_TRUE@service_DATA = netatalk.xml
 @USE_SYSTEMD_TRUE@service_DATA = netatalk.service
 all: all-am
@@ -655,6 +666,7 @@ uninstall-am: uninstall-serviceDATA uninstall-sysvSCRIPTS
 	    -e s@:SBINDIR:@${sbindir}@ \
 	    -e s@:ETCDIR:@${pkgconfdir}@ \
 	    -e s@:NETATALK_VERSION:@${NETATALK_VERSION}@ \
+	    -e s@:PATH_NETATALK_LOCK:@${PATH_NETATALK_LOCK}@ \
 	    <$< >$@
 
 # overwrite automake uninstall
