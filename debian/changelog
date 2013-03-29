@@ -1,4 +1,10 @@
-netatalk (3.0.2-1) UNRELEASED; urgency=low
+netatalk (3.0.3-1) UNRELEASED; urgency=low
+
+  * New upstream release. 
+
+ -- Nigel Roberts <nigel@nobiscuit.com>  Fri, 29 Mar 2013 07:44:44 +0000
+
+netatalk (3.0.2-1) unstable; urgency=low
 
   * New upstream release.
   * New ini style configuration file afp.conf which replaces all 
@@ -15,7 +21,7 @@ netatalk (3.0.2-1) UNRELEASED; urgency=low
   * Clean up files removed upstream
   * /var/spool/netatalk replaced with /var/netatalk
 
- -- Nigel Roberts <nigel@nobiscuit.com>  Sun, 24 Feb 2013 12:30:05 +0000
+ -- Nigel Roberts <nigel@nobiscuit.com>  Fri, 29 Mar 2013 07:44:22 +0000
 
 netatalk (2.2.2-1) unstable; urgency=low
 
